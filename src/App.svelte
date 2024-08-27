@@ -25,8 +25,10 @@
         <div>
           <p>this will be the browser</p>
           <div class="browser-content">
-            <!--<lua-script>return dom.test()</lua-script>-->
-            
+            <lua-script>local e = dom.newElement("header1")
+              dom.setText(e, "hello")
+              dom.pushElement(e)
+            </lua-script>
           </div>
         </div>
       {:else if activeTab === 'editor'}

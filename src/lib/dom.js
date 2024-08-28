@@ -41,18 +41,21 @@ function newElement(name) {
 }
 function setText(element, value) {
   element.innerHTML = value.toString()
+  return element;
 }
 function pushChild(parent, child) {
   parent.appendChild(child);
 }
 function setClass(element, name) {
   element.className = name.toString();
+  return element;
 }
 function getClass(element) {
   return element.className;
 }
 function pushElement(element) {
   document.getElementsByClassName("browser-content")[0].appendChild(element);
+  return element;
 }
 export const dom = new Table({
   test,

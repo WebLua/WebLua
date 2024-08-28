@@ -9,6 +9,7 @@
     "start": "vite start"
   },
   "dependencies": {
+    "@sveltejs/adapter-vercel": "^5.4.3",
     "@sveltejs/kit": "^2.5.24",
     "lua-in-js": "^2.2.5",
     "svelte": "^4.2.19",

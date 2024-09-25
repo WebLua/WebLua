@@ -40,8 +40,14 @@ function newElement(name) {
   return document.createElement(unsimplifyElementName(name));
 }
 function setText(element, value) {
-  element.innerHTML = value.toString()
+  element.innerHTML = String(value);
   return element;
+}
+function setOnClick(element, value) {
+  if (element.tagName.toLowerCase() === "button") {
+    element.onclick = typeof value === "function" ? value : () => {};
+    return element
+  } else return "setOnClick only works for buttons"
 }
 function pushChild(parent, child) {
   parent.appendChild(child);
@@ -59,8 +65,12 @@ function pushElement(element) {
 }
 export const dom = new Table({
   test,
+  alert,
+  prompt,
+  confirm,
   newElement,
   setText,
+  setOnClick,
   pushChild,
   setClass,
   getClass,

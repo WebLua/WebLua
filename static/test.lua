@@ -1,3 +1,6 @@
-local e = dom.newElement("paragraph")
-e = dom.setText(e, "test lol")
+local e = dom.newElement("button")
+e = dom.setText(e, "test")
+e = dom.setOnClick(e, function()
+  dom.alert("hi")
+end)
 dom.pushElement(e)

@@ -1,8 +1,8 @@
 <script>
   import "../components/LuaScript.svelte";
-  import {initlua} from "../lib/lua.js";
+  import { initlua } from "../lib/lua.js";
   let activeTab = "browser";
-  let url = "weblua/test";
+  let url = "weblua://test";
   let history = [url];
   let currentIndex = 0;
 
@@ -25,27 +25,30 @@
   }
   function pushUrl(url) {
     let div = document.getElementsByClassName("browser-content")[0];
-    let l = initlua()
-    if (url.startsWith("weblua/")) {
-      url = url.split("/")
-      if (!url[1].endsWith(".lua")) {
-        url[1] = url[1] + ".lua"
+    if (url.startsWith("weblua://")) {
+      let l = initlua(true);
+      url = url.split("/");
+      if (!url[2].endsWith(".lua")) {
+        url[2] = url[2] + ".lua";
       }
       //alert(url)
-      let code = fetch(url[1]).then(response => response.text()).then(code => {;
-      //alert(code)
-      div.replaceChildren()
-      l.parse(code).exec()})
+      let code = fetch(url[2])
+        .then((response) => response.text())
+        .then((code) => {
+          //alert(code)
+          div.replaceChildren();
+          l.parse(code).exec();
+        });
     }
   }
   function navigateToUrl(e) {
     //alert(e.keyCode === 13)
     if ((e.keyCode ? e.keyCode : e.which) === 13) {
-      if (url.startsWith("weblua/")) {
+      if (url.startsWith("weblua://")) {
         history.push(url);
         currentIndex = history.length - 1;
         //alert(url);
-        pushUrl(url)
+        pushUrl(url);
       } else {
         alert("Invalid URL");
       }
@@ -85,6 +88,7 @@
           </div>
           <div class="browser-content">
             <!-- Render the browser content here -->
+            <!--<button>hi</button>-->
           </div>
         </div>
       {:else if activeTab === "editor"}
@@ -155,6 +159,9 @@
       background-color: #ddd;
       width: 10%;
       /*margin: 5px;*/
+    }
+    .browser-content * {
+      all: revert;
     }
     .url-input {
       padding: 10px;

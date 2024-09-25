@@ -23,10 +23,10 @@
       url = history[currentIndex];
     }
   }
-  function pushUrl(url) {
+  async function pushUrl(url) {
     let div = document.getElementsByClassName("browser-content")[0];
     if (url.startsWith("weblua://")) {
-      let l = initlua(true);
+      let l = await initlua(true);
       url = url.split("/");
       if (!url[2].endsWith(".lua")) {
         url[2] = url[2] + ".lua";

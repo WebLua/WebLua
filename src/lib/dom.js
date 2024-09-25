@@ -30,9 +30,6 @@ function unsimplifyElementName(name) {
     default: return name;
   }
 }
-function test() {
-  return "test lol";
-}
 function newElement(name) {
   name = name.toString();
   if (name.toLowerCase() == "script") return "script tags are not allowed!";
@@ -43,9 +40,16 @@ function setText(element, value) {
   element.innerHTML = String(value);
   return element;
 }
+function getText(element) {
+  return String(element.innerHTML || element.textContent || element.value);
+}
+function getElementByName(name) {
+  //console.log(document.getElementsByClassName("browser-content")[0].querySelector(`#${String(name)}`))
+  return document.getElementsByClassName("browser-content")[0].querySelector(`#${String(name)}`)
+}
 function setOnClick(element, value) {
   if (element.tagName.toLowerCase() === "button") {
-    element.onclick = typeof value === "function" ? value : () => {};
+    element.onclick = typeof value === "function" ? value : () => { };
     return element
   } else return "setOnClick only works for buttons"
 }
@@ -59,12 +63,18 @@ function setClass(element, name) {
 function getClass(element) {
   return element.className;
 }
+function setName(element, name) {
+  element.id = String(name);
+  return element;
+}
+function getName(element) {
+  return String(element.id);
+}
 function pushElement(element) {
   document.getElementsByClassName("browser-content")[0].appendChild(element);
   return element;
 }
 export const dom = new Table({
-  test,
   alert,
   prompt,
   confirm,
@@ -75,4 +85,8 @@ export const dom = new Table({
   setClass,
   getClass,
   pushElement,
+  setName,
+  getName,
+  getText,
+  getElementByName,
 })

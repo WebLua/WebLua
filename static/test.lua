@@ -1,5 +1,5 @@
 local e = dom.newElement("paragraph")
-e = dom.setText(e, "updated test.lua file, you can now run javascript code like in the browser console")
+e = dom.setText(e, "try typing \"aaa.png\" and pressing run, it will change the image")
 dom.pushElement(e)
 e = dom.newElement("textarea")
 e = dom.setName(e, "code")
@@ -11,9 +11,9 @@ e = dom.setOnClick(e, function()
 end)
 dom.pushElement(e)
 
-e = dom.newElement("paragraph")
+--[[e = dom.newElement("paragraph")
 e = dom.setText(e, "This is a paragraph with some <b>bold</b> and <i>italic</b> text.")
-dom.pushElement(e)
+dom.pushElement(e)]]--
 
 e = dom.newElement("div")
 dom.pushElement(e)

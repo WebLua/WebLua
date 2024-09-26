@@ -37,11 +37,15 @@ function newElement(name) {
   return document.createElement(unsimplifyElementName(name));
 }
 function setText(element, value) {
-  element.innerHTML = String(value);
+  element.textContent = String(value);
   return element;
 }
 function getText(element) {
   return String(element.innerHTML || element.textContent || element.value);
+}
+function setSrc(element, value) {
+  element.src = String(value);
+  return element;
 }
 function getElementByName(name) {
   //console.log(document.getElementsByClassName("browser-content")[0].querySelector(`#${String(name)}`))
@@ -89,4 +93,5 @@ export const dom = new Table({
   getName,
   getText,
   getElementByName,
+  setSrc,
 })

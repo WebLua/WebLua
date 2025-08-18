@@ -1,6 +1,5 @@
 <script>
     import { tick } from "svelte";
-    import "../components/LuaScript.svelte";
     import { initlua, dom } from "../lib/lua.js";
 
     let activeTab = "browser";

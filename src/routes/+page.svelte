@@ -160,7 +160,7 @@ newElement("button")
 ]])
 
 -- Interactive demo section
-newElement("header2e")
+newElement("header2")
     :setText("Interactive Demo")
     :setStyle("color: #333; margin-top: 30px;")
     :pushElement()
@@ -178,7 +178,7 @@ newElement("button")
         margin-bottom: 10px;
     ]])
     :setOnClick(function()
-        newElement("p")
+        newElement("paragraph")
             :setText("This was added dynamically!")
             :setStyle("color: #007ACC; font-weight: bold; margin: 5px 0;")
             :pushElement()

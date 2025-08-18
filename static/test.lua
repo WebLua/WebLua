@@ -1,28 +1,22 @@
-local e = dom.newElement("paragraph")
-e = dom.setText(e, "try typing \"aaa.png\" and pressing run, it will change the image")
-dom.pushElement(e)
-e = dom.newElement("textarea")
-e = dom.setName(e, "code")
-dom.pushElement(e)
-e = dom.newElement("button")
-e = dom.setText(e, "run")
-e = dom.setOnClick(e, function()
-    dom.setSrc(dom.getElementByName("image"), dom.getText(dom.getElementByName("code")))
-end)
-dom.pushElement(e)
+-- Paragraph
+newElement("p"):setText('try typing "aaa.png" and pressing run, it will change the image'):pushElement()
 
---[[e = dom.newElement("paragraph")
-e = dom.setText(e, "This is a paragraph with some <b>bold</b> and <i>italic</b> text.")
-dom.pushElement(e)]]--
+-- Textarea
+newElement("textarea"):setName("code"):pushElement()
 
-e = dom.newElement("div")
-dom.pushElement(e)
+-- Button
+newElement("button")
+    :setText("run")
+    :setOnClick(function()
+        getElementByName("image"):setSrc(getElementByName("code"):getText())
+    end)
+    :pushElement()
 
-e = dom.newElement("h1")
-e = dom.setText(e, "Heading 1")
-dom.pushElement(e)
+-- Divider
+newElement("div"):pushElement()
 
-local p = dom.newElement("image")
-p = dom.setSrc(p, "www.png")
-p = dom.setName(p, "image")
-dom.pushElement(p)
+-- Heading
+newElement("h1"):setText("Heading 1"):pushElement()
+
+-- Image
+newElement("img"):setSrc("www.png"):setName("image"):pushElement()

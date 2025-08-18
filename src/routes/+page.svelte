@@ -76,7 +76,7 @@
     let aceEditor;
     let luaEditorInstance;
     let editorCode = `-- Set up the page container
-newElement("div")
+newElement("divider")
     :setStyle([[
         font-family: Arial, sans-serif;
         padding: 20px;
@@ -86,19 +86,19 @@ newElement("div")
     :pushElement()
 
 -- Page title
-newElement("h1")
+newElement("header1")
     :setText("WebLua Documentation")
     :setStyle("color: #333; margin-bottom: 10px;")
     :pushElement()
 
 -- Intro paragraph
-newElement("p")
+newElement("paragraph")
     :setText("WebLua allows you to create interactive web pages using Lua instead of JavaScript in the browser. Everything runs inside an iframe, and all DOM manipulations use the LuaElement API.")
     :setStyle("color: #555; font-size: 16px; line-height: 1.5;")
     :pushElement()
 
 -- Methods section
-newElement("h2")
+newElement("header2")
     :setText("Available LuaElement Methods")
     :setStyle("color: #333; margin-top: 30px;")
     :pushElement()
@@ -121,10 +121,10 @@ local methods = {
     {name="LuaElement.getElementByName(id)", desc="Retrieve element by id from the current document."}
 }
 
-local ul = newElement("ul")
+local ul = newElement("unorderedList")
 for _, m in ipairs(methods) do
     ul:pushChild(
-        newElement("li")
+        newElement("listItem")
             :setText(m.name .. " — " .. m.desc)
             :setStyle("font-size: 14px; color: #555; margin: 5px 0;")
     )
@@ -132,13 +132,13 @@ end
 ul:pushElement()
 
 -- Example usage section
-newElement("h2")
+newElement("header2")
     :setText("Example Usage")
     :setStyle("color: #333; margin-top: 30px;")
     :pushElement()
 
 -- Example code container
-local codeContainer = newElement("pre")
+local codeContainer = newElement("preformattedText")
     :setStyle([[
         background-color: #f0f0f0;
         padding: 15px;
@@ -160,7 +160,7 @@ newElement("button")
 ]])
 
 -- Interactive demo section
-newElement("h2")
+newElement("header2e")
     :setText("Interactive Demo")
     :setStyle("color: #333; margin-top: 30px;")
     :pushElement()
@@ -186,7 +186,7 @@ newElement("button")
     :pushElement()
 
 -- Footer note
-newElement("p")
+newElement("paragraph")
     :setText("All elements use LuaElement API. You can create custom tags or non-simplified elements by passing any tag string to newElement().")
     :setStyle("color: #888; font-size: 13px; margin-top: 40px;")
     :pushElement()`;

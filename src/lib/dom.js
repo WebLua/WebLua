@@ -217,6 +217,7 @@ export const dom = {
     setSrc: (el, val) => el.setSrc(val),
     setOnClick: (el, fn) => el.setOnClick(fn),
     pushChild: (parent, child) => parent.pushChild(child),
+    pushChildren: (parent, children) => parent.pushChildren(children),
     pushElement: (el) => el.pushElement(),
     setClass: (el, cls) => el.setClass(cls),
     getClass: (el) => el.getClass(),

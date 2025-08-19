@@ -293,7 +293,7 @@ newElement("paragraph")
         previewContainer.appendChild(iframe);
 
         // init lua instance for the editor preview
-        luaEditorInstance = await initlua(true);
+        luaEditorInstance = await initlua(false);
         updatePreview();
 
         // enable completions

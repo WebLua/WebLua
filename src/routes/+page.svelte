@@ -1,3 +1,9 @@
+<svelte:head>
+        <!-- IE -->
+        <link rel="shortcut icon" type="image/png" href="favicon.png"/>
+        <!-- other browsers -->
+        <link rel="icon" type="image/png" href="favicon.png"/>
+    </svelte:head>
 <script>
     import { tick } from "svelte";
     import { initlua, dom } from "../lib/lua.js";
@@ -72,6 +78,8 @@
     // Editor
     let editorContainer;
     let previewContainer;
+    let consoleContainer;
+    let consoleMessages = [];
     let aceEditor;
     let luaEditorInstance;
     let editorCode = `-- Set up the page container
@@ -234,12 +242,13 @@ newElement("paragraph")
     }
 
     async function initEditor(force = false) {
-        if (!editorContainer || !previewContainer) return;
+        if (!editorContainer || !previewContainer || !consoleContainer) return;
         if (aceEditor && !force) return;
 
         // clear previous nodes (keeps bindings stable)
-        editorContainer.innerHTML = "";
-        previewContainer.innerHTML = "";
+    editorContainer.innerHTML = "";
+    previewContainer.innerHTML = "";
+    // Do NOT clear consoleContainer.innerHTML; let Svelte {#each} handle rendering
 
         // Load Ace core
         await new Promise((resolve, reject) => {
@@ -292,8 +301,25 @@ newElement("paragraph")
         iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
         previewContainer.appendChild(iframe);
 
+        // Setup console capture for the iframe
+        function setupConsoleCapture() {
+            // Listen for messages from the iframe
+            window.addEventListener("message", (event) => {
+                if (event.source !== iframe.contentWindow) return;
+                if (event.data && event.data.__weblua_console) {
+                    const msg = event.data.__weblua_console;
+                    const div = document.createElement("div");
+                    div.textContent = msg;
+                    div.className = "console-line";
+                    consoleContainer.appendChild(div);
+                    consoleContainer.scrollTop = consoleContainer.scrollHeight;
+                }
+            });
+        }
+        setupConsoleCapture();
+
         // init lua instance for the editor preview
-        luaEditorInstance = await initlua(false);
+        luaEditorInstance = await initlua(false, true);
         updatePreview();
 
         // enable completions
@@ -389,7 +415,6 @@ newElement("paragraph")
             .selection.on("changeCursor", updatePerEditorCompleters);
         aceEditor.getSession().on("change", () => {
             editorCode = aceEditor.getValue();
-            updatePreview();
             updatePerEditorCompleters();
         });
 
@@ -404,14 +429,10 @@ newElement("paragraph")
         const iframe = previewContainer.querySelector("iframe");
         if (!iframe) return;
 
-        iframe.srcdoc = `
-        <!DOCTYPE html>
-        <html><head>
-        <style>
-          html, body {margin:0; padding:0; width:100%; height:100%; overflow:auto;}
-        </style>
-        </head><body></body></html>
-        `;
+        // Clear console messages array
+        consoleMessages = [];
+
+        iframe.srcdoc = `<!DOCTYPE html><html><head><style>html, body {margin:0; padding:0; width:100%; height:100%; overflow:auto;}</style><script>(function() {function send(msg) {window.parent.postMessage({__weblua_console: msg}, "*");}const origLog = console.log;console.log = function(...args) {origLog.apply(console, args);send(args.map(String).join(" "));};const origError = console.error;console.error = function(...args) {origError.apply(console, args);send("[error] " + args.map(String).join(" "));};const origWarn = console.warn;console.warn = function(...args) {origWarn.apply(console, args);send("[warn] " + args.map(String).join(" "));};const origInfo = console.info;console.info = function(...args) {origInfo.apply(console, args);send("[info] " + args.map(String).join(" "));};})();<\/script></head><body></body></html>`;
 
         await new Promise((resolve) => {
             iframe.onload = () => {
@@ -421,12 +442,44 @@ newElement("paragraph")
             };
         });
 
+        // Listen for console messages from iframe
+        window.removeEventListener("message", window._weblua_console_listener);
+        window._weblua_console_listener = function(event) {
+            if (event.data && event.data.__weblua_console) {
+                consoleMessages = [...consoleMessages, event.data.__weblua_console];
+                tick().then(() => {
+                    if (consoleContainer) {
+                        consoleContainer.scrollTop = consoleContainer.scrollHeight;
+                    }
+                });
+            }
+        };
+        window.addEventListener("message", window._weblua_console_listener);
+
         // execute user's Lua in the editor preview's lua instance
-        await luaEditorInstance.doString(editorCode);
+        try {
+            await luaEditorInstance.doString(editorCode);
+        } catch (err) {
+            let msg = "Lua error: ";
+            if (err && err.message) {
+                msg += err.message;
+            } else if (typeof err === "string") {
+                msg += err;
+            } else {
+                msg += JSON.stringify(err);
+            }
+            consoleMessages = [...consoleMessages, msg];
+            tick().then(() => {
+                if (consoleContainer) {
+                    consoleContainer.scrollTop = consoleContainer.scrollHeight;
+                }
+            });
+        }
     }
 
     // Reinit editor when tab becomes active (force to handle tab switching)
     $: if (activeTab === "editor") tick().then(() => initEditor(true));
+
 </script>
 
 <main>
@@ -476,11 +529,23 @@ newElement("paragraph")
                         bind:this={editorContainer}
                         style="flex:1;height:100%"
                     ></div>
-                    <div
-                        class="preview-container"
-                        bind:this={previewContainer}
-                        style="flex:1;height:100%"
-                    ></div>
+                    <div style="flex:1;display:flex;flex-direction:column;height:100%">
+                        <button style="margin:8px 0 4px 0;padding:6px 18px;font-size:15px;background:#4CAF50;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={updatePreview}>Run</button>
+                        <div
+                            class="preview-container"
+                            bind:this={previewContainer}
+                            style="height:calc(100% - 130px);"
+                        ></div>
+                        <div
+                            class="console-container"
+                            bind:this={consoleContainer}
+                            style="height:120px;overflow-y:auto;background:#222;color:#eee;font-family:monospace;font-size:13px;padding:8px;border-top:1px solid #444;"
+                        >
+                            {#each consoleMessages as msg}
+                                <div class="console-line">{msg}</div>
+                            {/each}
+                        </div>
+                    </div>
                 </div>
             {:else if activeTab === "servers"}
                 <div><p>this will be the server list</p></div>
@@ -569,11 +634,31 @@ newElement("paragraph")
             height: 100%;
             overflow: auto;
         }
-        .editor-container,
-        .preview-container {
+        .editor-container {
             flex: 1;
             height: 100%;
             overflow: auto;
+        }
+        .preview-container {
+            width: 100%;
+            height: calc(100% - 130px);
+            overflow: auto;
+        }
+        .console-container {
+            width: 100%;
+            height: 120px;
+            overflow-y: auto;
+            background: #222;
+            color: #eee;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 8px;
+            border-top: 1px solid #444;
+        }
+        .console-line {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-bottom: 2px;
         }
         .editor-container .ace_editor {
             height: 100% !important;

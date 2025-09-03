@@ -102,11 +102,12 @@ export class LuaElement {
 
     // --- Chainable methods ---
     setText(value) {
-        this.el.textContent = String(value);
-        return this;
+    if (this.el) this.el.textContent = String(value);
+    return this;
     }
     getText() {
-        return String(this.el.value ?? this.el.textContent ?? "");
+    if (!this.el) return "";
+    return String(this.el.value ?? this.el.textContent ?? "");
     }
     setSrc(value) {
         if ("src" in this.el) this.el.src = String(value);
@@ -138,12 +139,28 @@ export class LuaElement {
             } catch (err) {
                 // Don't let errors kill the app — log for debugging.
                 // If fn is an async function returning a Promise, handle rejection.
+                const appendToVisualConsole = (msg) => {
+                    if (typeof window !== 'undefined') {
+                        const containers = document.getElementsByClassName('console-container');
+                        if (containers && containers.length > 0) {
+                            const div = document.createElement('div');
+                            if (div) div.textContent = msg;
+                            div.className = 'console-line';
+                            containers[0].appendChild(div);
+                            containers[0].scrollTop = containers[0].scrollHeight;
+                        }
+                    }
+                };
                 if (err && typeof err.then === "function") {
-                    err.catch((e) =>
-                        console.error("setOnClick async error:", e)
-                    );
+                    err.catch((e) => {
+                        const msg = `setOnClick async error: ${e}`;
+                        console.error(msg);
+                        appendToVisualConsole(msg);
+                    });
                 } else {
-                    console.error("setOnClick handler error:", err);
+                    const msg = `setOnClick handler error: ${err}`;
+                    console.error(msg);
+                    appendToVisualConsole(msg);
                 }
             }
         };

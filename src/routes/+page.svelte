@@ -201,6 +201,7 @@ newElement("button")
             :setText("This was added dynamically!")
             :setStyle("color: #007ACC; font-weight: bold; margin: 5px 0;")
             :pushElement()
+        print("Added dynamic element!")
     end)
     :pushElement()
 
@@ -577,7 +578,7 @@ newElement("paragraph")
                             {#each consoleMessages as msg}
                                 <div class="console-line console-{msg.level}">
                                     <span class="console-ts">{(() => {
-                                        const d = new Date(msg.ts);
+                                    const d = new Date(msg.ts);
                                         let h = d.getHours();
                                         const m = d.getMinutes();
                                         const s = d.getSeconds();

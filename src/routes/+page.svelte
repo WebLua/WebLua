@@ -3,6 +3,7 @@
         <link rel="shortcut icon" type="image/png" href="favicon.png"/>
         <!-- other browsers -->
         <link rel="icon" type="image/png" href="favicon.png"/>
+        <title>WebLua</title>
     </svelte:head>
 <script>
     import { tick } from "svelte";

@@ -102,12 +102,12 @@ export class LuaElement {
 
     // --- Chainable methods ---
     setText(value) {
-    if (this.el) this.el.textContent = String(value);
-    return this;
+        if (this.el) this.el.textContent = String(value);
+        return this;
     }
     getText() {
-    if (!this.el) return "";
-    return String(this.el.value ?? this.el.textContent ?? "");
+        if (!this.el) return "";
+        return String(this.el.value ?? this.el.textContent ?? "");
     }
     setSrc(value) {
         if ("src" in this.el) this.el.src = String(value);
@@ -141,13 +141,18 @@ export class LuaElement {
                 // If fn is an async function returning a Promise, handle rejection.
                 const appendToVisualConsole = (msg) => {
                     if (typeof window !== 'undefined') {
-                        const containers = document.getElementsByClassName('console-container');
-                        if (containers && containers.length > 0) {
-                            const div = document.createElement('div');
-                            if (div) div.textContent = msg;
-                            div.className = 'console-line';
-                            containers[0].appendChild(div);
-                            containers[0].scrollTop = containers[0].scrollHeight;
+                        const payload = { text: String(msg), ts: Date.now(), level: 'error' };
+                        try {
+                            window.postMessage({ __weblua_console: payload }, '*');
+                        } catch (e) {
+                            const containers = document.getElementsByClassName('console-container');
+                            if (containers && containers.length > 0) {
+                                const div = document.createElement('div');
+                                if (div) div.textContent = msg;
+                                div.className = 'console-line';
+                                containers[0].appendChild(div);
+                                containers[0].scrollTop = containers[0].scrollHeight;
+                            }
                         }
                     }
                 };
@@ -226,21 +231,22 @@ export class LuaElement {
 }
 
 // dom helper
+
 export const dom = {
     newElement: (tag) => new LuaElement(tag),
     getElementByName: LuaElement.getElementByName,
-    setText: (el, val) => el.setText(val),
-    getText: (el) => el.getText(),
-    setSrc: (el, val) => el.setSrc(val),
-    setOnClick: (el, fn) => el.setOnClick(fn),
+    setText: (element, val) => element.setText(val),
+    getText: (element) => element.getText(),
+    setSrc: (element, val) => element.setSrc(val),
+    setOnClick: (element, fn) => element.setOnClick(fn),
     pushChild: (parent, child) => parent.pushChild(child),
     pushChildren: (parent, children) => parent.pushChildren(children),
-    pushElement: (el) => el.pushElement(),
-    setClass: (el, cls) => el.setClass(cls),
-    getClass: (el) => el.getClass(),
-    setName: (el, name) => el.setName(name),
-    getName: (el) => el.getName(),
-    setStyle: (el, style) => el.setStyle(style),
-    hide: (el) => el.hide(),
-    show: (el) => el.show(),
+    pushElement: (element) => element.pushElement(),
+    setClass: (element, cls) => element.setClass(cls),
+    getClass: (element) => element.getClass(),
+    setName: (element, name) => element.setName(name),
+    getName: (element) => element.getName(),
+    setStyle: (element, style) => element.setStyle(style),
+    hide: (element) => element.hide(),
+    show: (element) => element.show(),
 };

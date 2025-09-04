@@ -6,7 +6,7 @@
     </svelte:head>
 <script>
     import { tick } from "svelte";
-    import { initlua, dom } from "../lib/lua.js";
+    import { initlua, dom, js} from "../lib/lua.js";
 
     let activeTab = "browser";
     let url = "weblua://aboutme";
@@ -37,9 +37,12 @@
 
         iframe.srcdoc = `
         <!DOCTYPE html>
-        <html><head>
-        <style>html, body {margin:0; padding:0; width:100%; overflow:auto !important;}</style>
-        </head><body></body></html>
+        <html>
+            <head>
+                <style>html, body {margin:0; padding:0; width:100%; overflow:auto !important; box-sizing: border-box;} *, *:before, *:after {box-sizing: inherit;}</style>
+            </head>
+            <body></body>
+        </html>
         `;
 
         await new Promise((resolve) => {
@@ -80,6 +83,15 @@
     let previewContainer;
     let consoleContainer;
     let consoleMessages = [];
+
+    function clearConsole() {
+        consoleMessages = [];
+        tick().then(() => {
+            if (consoleContainer) {
+                consoleContainer.scrollTop = 0;
+            }
+        });
+    }
     let aceEditor;
     let luaEditorInstance;
     let editorCode = `-- Set up the page container
@@ -301,25 +313,10 @@ newElement("paragraph")
         iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
         previewContainer.appendChild(iframe);
 
-        // Setup console capture for the iframe
-        function setupConsoleCapture() {
-            // Listen for messages from the iframe
-            window.addEventListener("message", (event) => {
-                if (event.source !== iframe.contentWindow) return;
-                if (event.data && event.data.__weblua_console) {
-                    const msg = event.data.__weblua_console;
-                    const div = document.createElement("div");
-                    div.textContent = msg;
-                    div.className = "console-line";
-                    consoleContainer.appendChild(div);
-                    consoleContainer.scrollTop = consoleContainer.scrollHeight;
-                }
-            });
-        }
-        setupConsoleCapture();
+    // Console messages are handled by the centralized listener in updatePreview()
 
         // init lua instance for the editor preview
-        luaEditorInstance = await initlua(false, true);
+        luaEditorInstance = await initlua(false, true); //no local, so no full js library, but allow safeJs which is prompt, confirm, and alert, no eval
         updatePreview();
 
         // enable completions
@@ -334,6 +331,35 @@ newElement("paragraph")
             dom && typeof dom === "object"
                 ? Object.keys(dom).filter((k) => typeof dom[k] === "function")
                 : [];
+
+        // Track which js.js functions are available in the editor (safeJs mode)
+        // Only prompt, confirm, alert are available in safeJs mode (initlua(false, true))
+        // See src/lib/lua.js for details
+        const safeJsKeys = ["alert", "prompt", "confirm"];
+        const jsKeys = js && typeof js === "object"
+            ? Object.keys(js).filter((k) => typeof js[k] === "function" && safeJsKeys.includes(k))
+            : [];
+
+        const jsCompleter = {
+            getCompletions(editor, session, pos, prefix, callback) {
+                // only provide js completions when not inside newElement string
+                const ctx = isInsideNewElementString(session, pos);
+                if (ctx) {
+                    callback(null, []);
+                    return;
+                }
+                const suggestions = jsKeys
+                    .filter((name) => name.startsWith(prefix || ""))
+                    .map((name) => ({
+                        caption: name,
+                        value: name,
+                        meta: "js",
+                        score: 700,
+                    }));
+                callback(null, suggestions);
+            },
+            identifierRegexps: [/[a-zA-Z0-9_]+/],
+        };
 
         // completer for newElement("...") strings (only fires inside those strings)
         const newElementCompleter = {
@@ -393,18 +419,13 @@ newElement("paragraph")
             const session = aceEditor.getSession();
             const ctx = isInsideNewElementString(session, pos);
             if (ctx) {
-                // when inside newElement string, show only newElementCompleter (so no other results)
                 aceEditor.completers = [newElementCompleter];
-                // show popup immediately (prefix may be empty)
-                // calling execCommand('startAutocomplete') repeatedly is fine; it opens if closed
                 try {
                     aceEditor.execCommand("startAutocomplete");
-                } catch (e) {
-                    /* ignore */
-                }
+                } catch (e) {}
             } else {
-                // not inside newElement string: prefer domCompleter first then restore defaults
-                aceEditor.completers = [domCompleter, ...originalCompleters];
+                // not inside newElement string: prefer domCompleter, jsCompleter, then restore defaults
+                aceEditor.completers = [domCompleter, jsCompleter, ...originalCompleters];
             }
         }
 
@@ -429,10 +450,9 @@ newElement("paragraph")
         const iframe = previewContainer.querySelector("iframe");
         if (!iframe) return;
 
-        // Clear console messages array
-        consoleMessages = [];
+    // keep existing console messages so errors append instead of replacing
 
-        iframe.srcdoc = `<!DOCTYPE html><html><head><style>html, body {margin:0; padding:0; width:100%; height:100%; overflow:auto;}</style><script>(function() {function send(msg) {window.parent.postMessage({__weblua_console: msg}, "*");}const origLog = console.log;console.log = function(...args) {origLog.apply(console, args);send(args.map(String).join(" "));};const origError = console.error;console.error = function(...args) {origError.apply(console, args);send("[error] " + args.map(String).join(" "));};const origWarn = console.warn;console.warn = function(...args) {origWarn.apply(console, args);send("[warn] " + args.map(String).join(" "));};const origInfo = console.info;console.info = function(...args) {origInfo.apply(console, args);send("[info] " + args.map(String).join(" "));};})();<\/script></head><body></body></html>`;
+    iframe.srcdoc = `<!DOCTYPE html><html><head><style>html, body {margin:0; padding:0; width:100%; height:100%; overflow:auto;}</style><script>(function() {function send(text, level) {var payload = {text: String(text), ts: Date.now(), level: level || 'log'}; window.parent.postMessage({__weblua_console: payload}, "*");}const origLog = console.log;console.log = function(...args) {origLog.apply(console, args);send(args.map(String).join(" "), 'log');};const origError = console.error;console.error = function(...args) {origError.apply(console, args);send(args.map(String).join(" "), 'error');};const origWarn = console.warn;console.warn = function(...args) {origWarn.apply(console, args);send(args.map(String).join(" "), 'warn');};const origInfo = console.info;console.info = function(...args) {origInfo.apply(console, args);send(args.map(String).join(" "), 'info');};})();<\/script></head><body></body></html>`;
 
         await new Promise((resolve) => {
             iframe.onload = () => {
@@ -446,7 +466,16 @@ newElement("paragraph")
         window.removeEventListener("message", window._weblua_console_listener);
         window._weblua_console_listener = function(event) {
             if (event.data && event.data.__weblua_console) {
-                consoleMessages = [...consoleMessages, event.data.__weblua_console];
+                const payload = event.data.__weblua_console;
+                let item;
+                if (typeof payload === 'string') {
+                    item = { text: payload, ts: Date.now(), level: 'log' };
+                } else if (payload && typeof payload === 'object') {
+                    item = { text: payload.text || String(payload), ts: payload.ts || Date.now(), level: payload.level || 'log' };
+                } else {
+                    item = { text: String(payload), ts: Date.now(), level: 'log' };
+                }
+                consoleMessages = [...consoleMessages, item];
                 tick().then(() => {
                     if (consoleContainer) {
                         consoleContainer.scrollTop = consoleContainer.scrollHeight;
@@ -468,12 +497,20 @@ newElement("paragraph")
             } else {
                 msg += JSON.stringify(err);
             }
-            consoleMessages = [...consoleMessages, msg];
-            tick().then(() => {
-                if (consoleContainer) {
-                    consoleContainer.scrollTop = consoleContainer.scrollHeight;
-                }
-            });
+            // Append Lua error with timestamp from the parent runtime.
+            // Use a short defer to allow in-flight postMessage events to arrive
+            // with their original timestamps from the iframe. We'll still display
+            // messages in the order they were timestamped (the UI appends as-received,
+            // but each item carries a ts for clarity).
+            setTimeout(() => {
+                const item = { text: msg, ts: Date.now(), level: 'error' };
+                consoleMessages = [...consoleMessages, item];
+                tick().then(() => {
+                    if (consoleContainer) {
+                        consoleContainer.scrollTop = consoleContainer.scrollHeight;
+                    }
+                });
+            }, 20);
         }
     }
 
@@ -517,10 +554,7 @@ newElement("paragraph")
                             class="url-input"
                         />
                     </div>
-                    <div
-                        class="browser-content"
-                        bind:this={browserContainer}
-                    ></div>
+                    <div class="browser-content" bind:this={browserContainer}></div>
                 </div>
             {:else if activeTab === "editor"}
                 <div class="editor-tab" style="display:flex; flex:1;">
@@ -530,19 +564,32 @@ newElement("paragraph")
                         style="flex:1;height:100%"
                     ></div>
                     <div style="flex:1;display:flex;flex-direction:column;height:100%">
-                        <button style="margin:8px 0 4px 0;padding:6px 18px;font-size:15px;background:#4CAF50;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={updatePreview}>Run</button>
+                        <div style="display:flex;gap:8px;margin:8px 0 4px 0;">
+                            <button style="padding:6px 18px;font-size:15px;background:#4CAF50;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={updatePreview}>Run</button>
+                            <button style="padding:6px 18px;font-size:15px;background:#888;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={clearConsole}>Clear Console</button>
+                        </div>
                         <div
                             class="preview-container"
                             bind:this={previewContainer}
                             style="height:calc(100% - 130px);"
                         ></div>
-                        <div
-                            class="console-container"
-                            bind:this={consoleContainer}
-                            style="height:120px;overflow-y:auto;background:#222;color:#eee;font-family:monospace;font-size:13px;padding:8px;border-top:1px solid #444;"
-                        >
+                        <div class="console-container" bind:this={consoleContainer}>
                             {#each consoleMessages as msg}
-                                <div class="console-line">{msg}</div>
+                                <div class="console-line console-{msg.level}">
+                                    <span class="console-ts">{(() => {
+                                        const d = new Date(msg.ts);
+                                        let h = d.getHours();
+                                        const m = d.getMinutes();
+                                        const s = d.getSeconds();
+                                        const ms = d.getMilliseconds();
+                                        const ampm = h >= 12 ? 'PM' : 'AM';
+                                        h = h % 12;
+                                        if (h === 0) h = 12;
+                                        const pad = n => n.toString().padStart(2, '0');
+                                        return `${h}:${pad(m)}:${pad(s)}.${ms.toString().padStart(3, '0')} ${ampm}`;
+                                    })()}</span>
+                                    <span class="console-text">{msg.text}</span>
+                                </div>
                             {/each}
                         </div>
                     </div>
@@ -609,7 +656,7 @@ newElement("paragraph")
             padding: 5px;
             color: #000;
             background: #ddd;
-            width: 10%;
+            width: auto;
         }
         .browser-content {
             flex: 1;
@@ -625,7 +672,9 @@ newElement("paragraph")
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            width: 1000vw;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         .editor-tab {
@@ -633,6 +682,7 @@ newElement("paragraph")
             flex: 1;
             height: 100%;
             overflow: auto;
+            max-width: 100%;
         }
         .editor-container {
             flex: 1;
@@ -647,19 +697,44 @@ newElement("paragraph")
         .console-container {
             width: 100%;
             height: 120px;
+            /* use auto so scrollbar shows only when needed */
             overflow-y: auto;
+            box-sizing: border-box;
+            /* add a subtle inset shadow instead of border-right to avoid increasing layout width */
+            box-shadow: inset -6px 0 6px -6px rgba(0,0,0,0.18);
+            /*scrollbar-width: thin;*/
+            scrollbar-color: #888 #222;
             background: #222;
             color: #eee;
             font-family: monospace;
             font-size: 13px;
             padding: 8px;
             border-top: 1px solid #444;
+            position: relative;
+        }
+        /* Chrome, Edge, Safari */
+        .console-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .console-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .console-container::-webkit-scrollbar-track {
+            background: #222;
         }
         .console-line {
             white-space: pre-wrap;
             word-break: break-word;
             margin-bottom: 2px;
         }
+        .console-ts {
+            color: #999;
+            margin-right: 8px;
+            font-size: 11px;
+        }
+        .console-text { color: #eee; }
+        .console-error .console-text { color: #ff6b6b; }
         .editor-container .ace_editor {
             height: 100% !important;
             width: 100% !important;
@@ -668,6 +743,19 @@ newElement("paragraph")
             width: 100%;
             height: 100%;
             border: none;
+        }
+        /* Responsive: stack editor and preview vertically on narrower screens */
+        @media (max-width: 900px) {
+            .editor-tab {
+                flex-direction: column;
+            }
+            .editor-container, .preview-container {
+                width: 100%;
+                height: 40vh;
+            }
+            .console-container {
+                height: 120px;
+            }
         }
     </style>
 </main>

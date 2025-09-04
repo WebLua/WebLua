@@ -1,7 +1,8 @@
 node_modules
 dist
-*svelte*kit
+.svelte-kit
 .vercel
 bun.lockb
+bun.lock
 package-lock.json
 *.lock*

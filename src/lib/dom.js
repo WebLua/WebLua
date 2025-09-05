@@ -156,7 +156,7 @@ export class LuaElement {
                         }
                     }
                 };
-                if (err && typeof err.then === "function") {
+                if (err != null && typeof err.then === "function") {
                     err.catch((e) => {
                         const msg = `setOnClick async error: ${e}`;
                         console.error(msg);
@@ -495,6 +495,50 @@ export const dom = {
         template.content.querySelectorAll('script').forEach((s) => s.remove());
         el.appendChild(template.content.cloneNode(true));
         return _wrap(el);
+    },
+
+    /* Scrolling helpers that act on the current document/window (works with iframe doc set via LuaElement.setDoc) */
+    scrollTo: (xOrOptions, y) => {
+        const doc = LuaElement.getDoc();
+        const win = (doc && doc.defaultView) || window;
+        if (!win) return null;
+        if (typeof xOrOptions === 'number') {
+            win.scrollTo(xOrOptions, y || 0);
+        } else {
+            // options object or undefined
+            try { win.scrollTo(xOrOptions || {}); } catch (e) { /* ignore */ }
+        }
+        return true;
+    },
+
+    scrollBy: (x, y) => {
+        const doc = LuaElement.getDoc();
+        const win = (doc && doc.defaultView) || window;
+        if (!win) return null;
+        try { win.scrollBy(x || 0, y || 0); } catch (e) { /* ignore */ }
+        return true;
+    },
+
+    scrollIntoView: (elementOrSelector, options) => {
+        const el = _unwrap(elementOrSelector) || LuaElement.getDoc().body;
+        if (!el) return null;
+        try { el.scrollIntoView(options || { behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+        return _wrap(el);
+    },
+
+    getScroll: () => {
+        const doc = LuaElement.getDoc();
+        const win = (doc && doc.defaultView) || window;
+        if (!win) return { x: 0, y: 0 };
+        return { x: win.scrollX || win.pageXOffset || 0, y: win.scrollY || win.pageYOffset || 0 };
+    },
+
+    setScroll: (x, y) => {
+        const doc = LuaElement.getDoc();
+        const win = (doc && doc.defaultView) || window;
+        if (!win) return null;
+        try { win.scrollTo(x || 0, y || 0); } catch (e) { /* ignore */ }
+        return true;
     },
 
     /* Logging helper used by other modules */

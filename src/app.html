@@ -5,7 +5,7 @@
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <!--<link rel="icon" href="/favicon.ico" />-->
                 <script src="//cdn.jsdelivr.net/npm/eruda"></script>
-                <script>eruda.init();</script>
+                <script>new URLSearchParams(window.location.search).has("debug")&&eruda.init();</script>
                 %sveltekit.head%
         </head>
         <body data-sveltekit-preload-data="hover">

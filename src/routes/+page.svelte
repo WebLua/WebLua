@@ -3,6 +3,7 @@
         <link rel="shortcut icon" type="image/png" href="favicon.png"/>
         <!-- other browsers -->
         <link rel="icon" type="image/png" href="favicon.png"/>
+        <title>WebLua</title>
     </svelte:head>
 <script>
     import { tick } from "svelte";
@@ -344,6 +345,7 @@
             if (aceEditor) {
                 aceEditor.setValue(txt, 1);
                 editorCode = aceEditor.getValue();
+                updatePreview();
             } else {
                 editorCode = txt;
             }
@@ -444,10 +446,7 @@
             <li class:active={activeTab === "editor"}>
                 <button on:click={() => (activeTab = "editor")}>Editor</button>
             </li>
-            <li class:active={activeTab === "servers"}>
-                <button on:click={() => (activeTab = "servers")}>Servers</button
-                >
-            </li>
+            
         </ul>
 
         <div class="tab-content">
@@ -512,8 +511,6 @@
                         </div>
                     </div>
                 </div>
-            {:else if activeTab === "servers"}
-                <div><p>this will be the server list</p></div>
             {/if}
         </div>
     </div>

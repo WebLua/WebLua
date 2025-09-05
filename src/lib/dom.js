@@ -231,22 +231,272 @@ export class LuaElement {
 }
 
 // dom helper
+// --- Utility helpers for dom API ---
+function _unwrap(element) {
+    if (!element) return null;
+    // LuaElement instance
+    if (element instanceof LuaElement) return element.el;
+    // DOM element
+    if (element.nodeType === 1 || element.nodeType === 9) return element;
+    // string -> try id
+    if (typeof element === "string") {
+        const doc = LuaElement.getDoc();
+        return doc.getElementById(element) || doc.querySelector(element) || null;
+    }
+    return null;
+}
 
+function _wrap(el) {
+    if (!el) return null;
+    return new LuaElement(el, el.ownerDocument || LuaElement.getDoc());
+}
+
+function logToConsole(text, level = "log") {
+    if (typeof window === "undefined") return;
+    const payload = { text: String(text), ts: Date.now(), level };
+    try {
+        window.postMessage({ __weblua_console: payload }, "*");
+    } catch (e) {
+        // no-op
+    }
+}
+
+/**
+ * Safe DOM helpers exported as `dom`.
+ * Methods accept a `LuaElement` or a raw DOM element. Strings are treated as
+ * an id or selector when appropriate.
+ */
 export const dom = {
     newElement: (tag) => new LuaElement(tag),
     getElementByName: LuaElement.getElementByName,
-    setText: (element, val) => element.setText(val),
-    getText: (element) => element.getText(),
-    setSrc: (element, val) => element.setSrc(val),
-    setOnClick: (element, fn) => element.setOnClick(fn),
-    pushChild: (parent, child) => parent.pushChild(child),
-    pushChildren: (parent, children) => parent.pushChildren(children),
-    pushElement: (element) => element.pushElement(),
-    setClass: (element, cls) => element.setClass(cls),
-    getClass: (element) => element.getClass(),
-    setName: (element, name) => element.setName(name),
-    getName: (element) => element.getName(),
-    setStyle: (element, style) => element.setStyle(style),
-    hide: (element) => element.hide(),
-    show: (element) => element.show(),
+    setText: (element, val) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.textContent = String(val);
+        return _wrap(el);
+    },
+    getText: (element) => {
+        const el = _unwrap(element);
+        if (!el) return "";
+        return String(el.value ?? el.textContent ?? "");
+    },
+    setSrc: (element, val) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        if ("src" in el) el.src = String(val);
+        return _wrap(el);
+    },
+    setOnClick: (element, fn) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        // delegate to LuaElement wrapper to keep behaviour
+        const wrapper = new LuaElement(el, el.ownerDocument || LuaElement.getDoc());
+        return wrapper.setOnClick(fn);
+    },
+    pushChild: (parent, child) => {
+        const p = _unwrap(parent);
+        const c = _unwrap(child) || (child instanceof LuaElement ? child.el : null);
+        if (!p || !c) return null;
+        p.appendChild(c);
+        return _wrap(p);
+    },
+    pushChildren: (parent, children) => {
+        const p = _unwrap(parent);
+        if (!p) return null;
+        children.forEach((c) => {
+            const el = _unwrap(c) || (c instanceof LuaElement ? c.el : null);
+            if (el) p.appendChild(el);
+        });
+        return _wrap(p);
+    },
+    pushElement: (element) => {
+        const el = _unwrap(element) || (element instanceof LuaElement ? element.el : null);
+        if (!el) return null;
+        const doc = LuaElement.getDoc();
+        doc.body.appendChild(el);
+        return _wrap(el);
+    },
+    setClass: (element, cls) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.className = String(cls);
+        return _wrap(el);
+    },
+    getClass: (element) => {
+        const el = _unwrap(element);
+        return el ? el.className : "";
+    },
+    setName: (element, name) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.id = String(name);
+        return _wrap(el);
+    },
+    getName: (element) => {
+        const el = _unwrap(element);
+        return el ? el.id : "";
+    },
+    setStyle: (element, style) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.style.cssText = style;
+        return _wrap(el);
+    },
+    hide: (element) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.style.display = "none";
+        return _wrap(el);
+    },
+    show: (element) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.style.display = "";
+        return _wrap(el);
+    },
+
+    /* Attributes */
+    setAttr: (element, name, value) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        if (value === null || value === undefined || value === false) {
+            el.removeAttribute(name);
+        } else if (value === true) {
+            el.setAttribute(name, "");
+        } else {
+            el.setAttribute(name, String(value));
+        }
+        return _wrap(el);
+    },
+    getAttr: (element, name) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        return el.getAttribute(name);
+    },
+    removeAttr: (element, name) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        el.removeAttribute(name);
+        return _wrap(el);
+    },
+
+    /* Querying */
+    find: (rootOrSelector, selector) => {
+        const doc = LuaElement.getDoc();
+        if (!selector) {
+            // only selector provided
+            const sel = String(rootOrSelector);
+            const found = doc.querySelector(sel);
+            return found ? _wrap(found) : null;
+        }
+        const root = _unwrap(rootOrSelector) || doc;
+        const found = root.querySelector(selector);
+        return found ? _wrap(found) : null;
+    },
+    findAll: (rootOrSelector, selector) => {
+        const doc = LuaElement.getDoc();
+        let nodes;
+        if (!selector) {
+            nodes = Array.from(doc.querySelectorAll(String(rootOrSelector)));
+        } else {
+            const root = _unwrap(rootOrSelector) || doc;
+            nodes = Array.from(root.querySelectorAll(selector));
+        }
+        return nodes.map((n) => _wrap(n));
+    },
+
+    /* Events */
+    on: (element, eventName, fn, options) => {
+        const el = _unwrap(element);
+        if (!el || typeof eventName !== 'string' || typeof fn !== 'function') return null;
+        el.__weblua_listeners = el.__weblua_listeners || {};
+        el.__weblua_listeners[eventName] = el.__weblua_listeners[eventName] || [];
+        el.addEventListener(eventName, fn, options || false);
+        el.__weblua_listeners[eventName].push({ fn, options });
+        return () => dom.off(el, eventName, fn);
+    },
+    off: (element, eventName, fn) => {
+        const el = _unwrap(element);
+        if (!el || !el.__weblua_listeners) return null;
+        if (!eventName) {
+            // remove all
+            for (const ev in el.__weblua_listeners) {
+                el.__weblua_listeners[ev].forEach((r) => el.removeEventListener(ev, r.fn, r.options));
+            }
+            el.__weblua_listeners = {};
+            return null;
+        }
+        const arr = el.__weblua_listeners[eventName] || [];
+        if (!fn) {
+            arr.forEach((r) => el.removeEventListener(eventName, r.fn, r.options));
+            el.__weblua_listeners[eventName] = [];
+            return null;
+        }
+        // remove matching fn
+        for (let i = arr.length - 1; i >= 0; i--) {
+            if (arr[i].fn === fn) {
+                el.removeEventListener(eventName, arr[i].fn, arr[i].options);
+                arr.splice(i, 1);
+            }
+        }
+        return null;
+    },
+    onOnce: (element, eventName, fn, options) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        const wrapper = function (e) {
+            try { fn(e); } finally { dom.off(el, eventName, wrapper); }
+        };
+        el.addEventListener(eventName, wrapper, options || false);
+        return () => dom.off(el, eventName, wrapper);
+    },
+
+    closest: (element, selector) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        const found = el.closest(selector);
+        return found ? _wrap(found) : null;
+    },
+
+    toggleClass: (element, className, force) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        if (typeof force === 'boolean') el.classList.toggle(className, force);
+        else el.classList.toggle(className);
+        return _wrap(el);
+    },
+
+    emit: (element, eventName, detail) => {
+        const el = _unwrap(element) || LuaElement.getDoc().body;
+        if (!el) return false;
+        const ev = new CustomEvent(eventName, { detail: detail ?? null, bubbles: true, cancelable: true });
+        return el.dispatchEvent(ev);
+    },
+
+    empty: (element) => {
+        const el = _unwrap(element);
+        if (!el) return null;
+        while (el.firstChild) el.removeChild(el.firstChild);
+        return _wrap(el);
+    },
+
+    serialize: (element) => {
+        const el = _unwrap(element);
+        if (!el) return '';
+        return el.outerHTML || '';
+    },
+
+    appendHTML: (element, html) => {
+        const el = _unwrap(element) || LuaElement.getDoc().body;
+        if (!el) return null;
+        const template = (el.ownerDocument || LuaElement.getDoc()).createElement('template');
+        template.innerHTML = String(html);
+        // remove script tags for safety
+        template.content.querySelectorAll('script').forEach((s) => s.remove());
+        el.appendChild(template.content.cloneNode(true));
+        return _wrap(el);
+    },
+
+    /* Logging helper used by other modules */
+    logToConsole,
 };

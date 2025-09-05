@@ -14,36 +14,37 @@
     let currentIndex = 0;
 
     let browserContainer;
+    let editorContainer = null;
+    let previewContainer = null;
+    let consoleContainer = null;
+    let consoleMessages = [];
+    let aceEditor = null;
+    let luaEditorInstance = null;
 
     async function pushUrl(url) {
         const container = browserContainer;
-        if (!url.startsWith("weblua://")) return alert("Invalid URL");
+        if (!url || typeof url !== 'string') return alert('Invalid URL');
+        const u = url.toString().trim();
+        if (!u.startsWith('weblua://')) return alert('Invalid URL');
+        if (u.toLowerCase().includes('javascript:')) return alert('Blocked unsafe URL');
 
         const lua = await initlua(true);
-        const parts = url.split("/");
-        if (!parts[2].endsWith(".lua")) parts[2] += ".lua";
+        const parts = u.split('/');
+        if (!parts[2].endsWith('.lua')) parts[2] += '.lua';
         const code = await fetch(parts[2]).then((r) => r.text());
 
-        let iframe = container.querySelector("iframe");
+        let iframe = container.querySelector('iframe');
         if (!iframe) {
-            iframe = document.createElement("iframe");
-            iframe.style.width = "100%";
-            iframe.style.height = "100%";
-            iframe.style.border = "0";
-            iframe.style.overflow = "auto"; // allow scrolling
-            iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
+            iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = '0';
+            iframe.style.overflow = 'auto';
+            iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
             container.appendChild(iframe);
         }
 
-        iframe.srcdoc = `
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <style>html, body {margin:0; padding:0; width:100%; overflow:auto !important; box-sizing: border-box;} *, *:before, *:after {box-sizing: inherit;}</style>
-            </head>
-            <body></body>
-        </html>
-        `;
+        iframe.srcdoc = `<!DOCTYPE html><html><head><style>html, body {margin:0; padding:0; width:100%; height:100%; overflow:auto;}</style></head><body></body></html>`;
 
         await new Promise((resolve) => {
             iframe.onload = () => {
@@ -56,160 +57,50 @@
         await lua.doString(code);
     }
 
+    // Navigation helpers for the browser tab
     function navigateToUrl(e) {
-        if ((e.keyCode ?? e.which) === 13) {
-            history.push(url);
+        if (!e) return;
+        if (e.key === 'Enter') {
+            const val = url && typeof url === 'string' ? url.trim() : '';
+            if (!val) return;
+            // push into history
+            // if we're not at the end, drop forward history
+            if (currentIndex < history.length - 1) {
+                history = history.slice(0, currentIndex + 1);
+            }
+            history.push(val);
             currentIndex = history.length - 1;
-            pushUrl(url);
+            pushUrl(val);
         }
     }
 
     function goBack() {
         if (currentIndex > 0) {
-            currentIndex--;
+            currentIndex -= 1;
             url = history[currentIndex];
+            pushUrl(url);
         }
     }
 
     function goForward() {
         if (currentIndex < history.length - 1) {
-            currentIndex++;
+            currentIndex += 1;
             url = history[currentIndex];
+            pushUrl(url);
         }
     }
 
-    // Editor
-    let editorContainer;
-    let previewContainer;
-    let consoleContainer;
-    let consoleMessages = [];
+    let editorCode = "";
 
-    function clearConsole() {
-        consoleMessages = [];
-        tick().then(() => {
-            if (consoleContainer) {
-                consoleContainer.scrollTop = 0;
-            }
-        });
-    }
-    let aceEditor;
-    let luaEditorInstance;
-    let editorCode = `-- Set up the page container
-newElement("divider")
-    :setStyle([[
-        font-family: Arial, sans-serif;
-        padding: 20px;
-        max-width: 900px;
-        margin: auto;
-    ]])
-    :pushElement()
-
--- Page title
-newElement("header1")
-    :setText("WebLua Documentation")
-    :setStyle("color: #333; margin-bottom: 10px;")
-    :pushElement()
-
--- Intro paragraph
-newElement("paragraph")
-    :setText("WebLua allows you to create interactive web pages using Lua instead of JavaScript in the browser. Everything runs inside an iframe, and all DOM manipulations use the LuaElement API.")
-    :setStyle("color: #555; font-size: 16px; line-height: 1.5;")
-    :pushElement()
-
--- Methods section
-newElement("header2")
-    :setText("Available LuaElement Methods")
-    :setStyle("color: #333; margin-top: 30px;")
-    :pushElement()
-
-local methods = {
-    {name="setText(value)", desc="Set the textContent of the element. Chainable."},
-    {name="getText()", desc="Get the textContent (or value) of the element."},
-    {name="setSrc(value)", desc="Set the src attribute of an element like img or iframe."},
-    {name="setOnClick(fn)", desc="Set a click handler. fn receives (self, event)."},
-    {name="pushChild(child)", desc="Append a LuaElement child to this element."},
-    {name="pushChildren(children)", desc="Append multiple LuaElement children."},
-    {name="setClass(name)", desc="Set the class of the element."},
-    {name="getClass()", desc="Get the class of the element."},
-    {name="setName(id)", desc="Set the id of the element."},
-    {name="getName()", desc="Get the id of the element."},
-    {name="setStyle(cssText)", desc="Set inline CSS styles."},
-    {name="hide()", desc="Hide the element."},
-    {name="show()", desc="Show the element."},
-    {name="pushElement(container)", desc="Append the element to the iframe body or container."},
-    {name="LuaElement.getElementByName(id)", desc="Retrieve element by id from the current document."}
-}
-
-local ul = newElement("unorderedList")
-for _, m in ipairs(methods) do
-    ul:pushChild(
-        newElement("listItem")
-            :setText(m.name .. " — " .. m.desc)
-            :setStyle("font-size: 14px; color: #555; margin: 5px 0;")
-    )
-end
-ul:pushElement()
-
--- Example usage section
-newElement("header2")
-    :setText("Example Usage")
-    :setStyle("color: #333; margin-top: 30px;")
-    :pushElement()
-
--- Example code container
-local codeContainer = newElement("preformattedText")
-    :setStyle([[
-        background-color: #f0f0f0;
-        padding: 15px;
-        border-radius: 5px;
-        overflow-x: auto;
-    ]])
-    :pushElement()
-
-codeContainer:setText([[
--- Create a button
-newElement("button")
-    :setText("Click Me")
-    :setName("myButton")
-    :setStyle("padding: 10px 20px; font-size: 16px; margin-top: 10px;")
-    :setOnClick(function(self)
-        alert("Button clicked: " .. self:getName())
-    end)
-    :pushElement()
-]])
-
--- Interactive demo section
-newElement("header2")
-    :setText("Interactive Demo")
-    :setStyle("color: #333; margin-top: 30px;")
-    :pushElement()
-
-newElement("button")
-    :setText("Add Dynamic Element")
-    :setStyle([[
-        padding: 8px 15px;
-        font-size: 14px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-bottom: 10px;
-    ]])
-    :setOnClick(function()
-        newElement("paragraph")
-            :setText("This was added dynamically!")
-            :setStyle("color: #007ACC; font-weight: bold; margin: 5px 0;")
-            :pushElement()
-        print("Added dynamic element!")
-    end)
-    :pushElement()
-
--- Footer note
-newElement("paragraph")
-    :setText("All elements use LuaElement API. You can create custom tags or non-simplified elements by passing any tag string to newElement().")
-    :setStyle("color: #888; font-size: 13px; margin-top: 40px;")
-    :pushElement()`;
+    // Load default editor docs from static file
+    (async () => {
+        try {
+            editorCode = await fetch('/editor_docs.lua').then((r) => r.text());
+        } catch (e) {
+            // fallback to a small default if fetch fails
+            editorCode = "-- WebLua editor\nprint('Welcome to WebLua')";
+        }
+    })();
 
     // simplified element names (for newElement completions)
     const simplifiedElementNames = [
@@ -446,6 +337,21 @@ newElement("paragraph")
         // done: editor ready
     }
 
+    async function reloadDocs() {
+        if (!confirm('Reload docs from disk? This will replace your current editor contents.')) return;
+        try {
+            const txt = await fetch('/editor_docs.lua').then(r => r.text());
+            if (aceEditor) {
+                aceEditor.setValue(txt, 1);
+                editorCode = aceEditor.getValue();
+            } else {
+                editorCode = txt;
+            }
+        } catch (e) {
+            alert('Failed to reload docs: ' + e);
+        }
+    }
+
     async function updatePreview() {
         if (!previewContainer || !luaEditorInstance) return;
         const iframe = previewContainer.querySelector("iframe");
@@ -518,6 +424,14 @@ newElement("paragraph")
     // Reinit editor when tab becomes active (force to handle tab switching)
     $: if (activeTab === "editor") tick().then(() => initEditor(true));
 
+    function clearConsole() {
+        consoleMessages = [];
+        // allow UI to update and reset scroll
+        tick().then(() => {
+            if (consoleContainer) consoleContainer.scrollTop = 0;
+        });
+    }
+
 </script>
 
 <main>
@@ -567,6 +481,9 @@ newElement("paragraph")
                     <div style="flex:1;display:flex;flex-direction:column;height:100%">
                         <div style="display:flex;gap:8px;margin:8px 0 4px 0;">
                             <button style="padding:6px 18px;font-size:15px;background:#4CAF50;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={updatePreview}>Run</button>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <button style="margin:8px 0 4px 0;padding:6px 12px;font-size:13px;background:#1976D2;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={reloadDocs}>Reload docs</button>
+                            </div>
                             <button style="padding:6px 18px;font-size:15px;background:#888;color:white;border:none;border-radius:4px;align-self:flex-start;cursor:pointer;" on:click={clearConsole}>Clear Console</button>
                         </div>
                         <div
